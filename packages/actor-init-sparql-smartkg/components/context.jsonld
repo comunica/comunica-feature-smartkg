@@ -1,0 +1,11 @@
+{
+  "@context": [
+    "https://linkedsoftwaredependencies.org/bundles/npm/componentsjs/^3.0.0/components/context.jsonld",
+    {
+      "npmd": "https://linkedsoftwaredependencies.org/bundles/npm/",
+      "caisskg": "npmd:@comunica/actor-init-sparql-smartkg/",
+      "files-caisskg": "caisskg:^1.0.0/",
+      "config-caisskg": "files-caisskg:config/sets/"
+    }
+  ]
+}

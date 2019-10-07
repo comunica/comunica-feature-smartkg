@@ -1,0 +1,245 @@
+import {ActorHttp, IActionHttp, IActorHttpOutput} from "@comunica/bus-http";
+import {
+  ActorQueryOperation,
+  ActorQueryOperationTypedMediated,
+  IActorQueryOperationOutput,
+  IActorQueryOperationTypedMediatedArgs,
+} from "@comunica/bus-query-operation";
+import {IActorQueryOperationOutputBindings} from "@comunica/bus-query-operation/lib/ActorQueryOperation";
+import {ActorRdfJoin, IActionRdfJoin} from "@comunica/bus-rdf-join";
+import {
+  DataSources,
+  getDataSourceValue,
+  IDataSource,
+  KEY_CONTEXT_SOURCES,
+} from "@comunica/bus-rdf-resolve-quad-pattern";
+import {ActionContext, Actor, IActorTest, Mediator} from "@comunica/core";
+import {IMediatorTypeIterations} from "@comunica/mediatortype-iterations";
+import {AsyncReiterableArray} from "asyncreiterable";
+import {createWriteStream, existsSync, mkdirSync} from "fs";
+import {join} from "path";
+import {termToString} from "rdf-string";
+import {Algebra, Factory} from "sparqlalgebrajs";
+import stringifyStream = require("stream-to-string");
+
+/**
+ * A comunica BGP SmartKG Query Operation Actor.
+ */
+export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMediated<Algebra.Bgp> {
+
+  public readonly mediatorHttp: Mediator<Actor<IActionHttp, IActorTest, IActorHttpOutput>,
+    IActionHttp, IActorTest, IActorHttpOutput>;
+  public readonly mediatorJoin: Mediator<ActorRdfJoin,
+    IActionRdfJoin, IMediatorTypeIterations, IActorQueryOperationOutput>;
+
+  private readonly cacheFolder: string;
+
+  constructor(args: IActorQueryOperationBgpSmartkgArgs) {
+    super(args, 'bgp');
+
+    // Initialize SmartKG cache for HDT files
+    this.cacheFolder = join(process.cwd(), '.smartkg-cache');
+    if (!existsSync(this.cacheFolder)) {
+      mkdirSync(this.cacheFolder);
+    }
+  }
+
+  public static getStarPatterns(pattern: Algebra.Bgp): Algebra.Pattern[][] {
+    const stars: {[subject: string]: Algebra.Pattern[]} = {};
+    for (const quadPattern of pattern.patterns) {
+      const subjectKey = termToString(quadPattern.subject);
+      if (!stars[subjectKey]) {
+        stars[subjectKey] = [];
+      }
+      stars[subjectKey].push(quadPattern);
+    }
+    return Object.keys(stars).map((key) => stars[key]);
+  }
+
+  public static isStarPatternSmartKg(patterns: Algebra.Pattern[], smartKgData: ISmartKgData): boolean {
+    if (patterns.length === 1) {
+      return false;
+    }
+    for (const pattern of patterns) {
+      if (pattern.predicate.termType === 'Variable' || smartKgData.infrequentPredicates[pattern.predicate.value]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public static getSingleSmartKgSourceUri(context: ActionContext): string {
+    // Determine all current sources
+    let sourceUri: string = null;
+    if (context.has(KEY_CONTEXT_SOURCES)) {
+      const dataSources: DataSources = context.get(KEY_CONTEXT_SOURCES);
+      let source: IDataSource;
+      const it = dataSources.iterator();
+      if (source = it.read()) { // tslint:disable-line:no-conditional-assignment
+        const sourceValue = getDataSourceValue(source);
+        if (typeof sourceValue === 'string') {
+          sourceUri = sourceValue;
+        } else {
+          // Require a source by URI
+          return null;
+        }
+      } else {
+        // Require at least one source
+        return null;
+      }
+      if (it.read()) {
+        // We can only handle a single source
+        return null;
+      }
+    } else {
+      return null;
+    }
+
+    // Check if the source is a SmartKG source
+    // TODO: do this with hypermedia in the future
+    if (sourceUri.indexOf('quantum') < 0) {
+      return null;
+    }
+
+    return sourceUri;
+  }
+
+  public async fetchHdtFile(baseUri: string, fileName: string, context: ActionContext): Promise<string> {
+    // Determine the file location in the local file system.
+    const localPath: string = join(this.cacheFolder, fileName);
+
+    // If the file already exists, don't fetch it
+    if (existsSync(localPath)) {
+      return localPath;
+    }
+
+    // Otherwise, fetch it and store it into our cache
+    const httpResponse = await this.mediatorHttp.mediate({ context, input: baseUri + '/' + fileName });
+    const bodyStream = ActorHttp.toNodeReadable(httpResponse.body);
+    return new Promise((resolve, reject) => {
+      bodyStream
+        .pipe(createWriteStream(localPath))
+        .on('error', reject)
+        .on('finish', () => resolve(localPath));
+    });
+  }
+
+  public async getStarPatternSmartKgSources(patterns: Algebra.Pattern[], smartKgData: ISmartKgData,
+                                            baseUri: string, context: ActionContext): Promise<DataSources> {
+    // Determine all predicates of the star pattern
+    const predicatesHash: {[predicate: string]: boolean} = {};
+    for (const pattern of patterns) {
+      predicatesHash[termToString(pattern.predicate)] = true;
+    }
+    const predicates: string[] = Object.keys(predicatesHash);
+
+    // Determine the HDT files that contain *at least* all the given predicates
+    const hdtSources = [];
+    for (const family of smartKgData.families) {
+      if (predicates.every((predicate) => family.predicateSet[predicate])) {
+        hdtSources.push({ type: 'hdtFile', value: await this.fetchHdtFile(baseUri, family.name, context) });
+      }
+    }
+
+    // TODO: if one grouped, remove all non-grouped. otherwise keep using the non-grouped ones.
+
+    // TODO: only use the groups equal to min(size(group))
+    // A, B, C
+    // A, B
+    // A, C
+    // A, B, C, C
+
+    // TODO: if number of files too big (5), then offload to TPF (but shouldn't occur for watdiv)
+
+    // TODO: if originalFamily, then offload to TPF
+
+    return AsyncReiterableArray.fromFixedData(hdtSources);
+  }
+
+  public async testOperation(pattern: Algebra.Bgp, context: ActionContext): Promise<IActorTest> {
+    if (pattern.patterns.length < 2) {
+      throw new Error('Actor ' + this.name + ' can only operate on BGPs with at least two patterns.');
+    }
+    if (!ActorQueryOperationBgpSmartkg.getSingleSmartKgSourceUri(context)) {
+      throw new Error('Actor ' + this.name + ' requires at least one SmartKG-enabled source.');
+    }
+    return { httpRequests: pattern.patterns.length }; // TODO: estimate number of requests more exactly.
+  }
+
+  public async runOperation(pattern: Algebra.Bgp, context: ActionContext): Promise<IActorQueryOperationOutput> {
+    const algebraFactory = new Factory();
+
+    // Determine SmartKG source
+    const sourceUri = ActorQueryOperationBgpSmartkg.getSingleSmartKgSourceUri(context);
+    const sourceUriSmartKg = sourceUri.replace('watdiv', 'molecule/watdiv'); // TODO: don't hardcode
+    // TODO: fetch SmartKG metadata in test to validate earlier, and cache the response
+    const httpResponse: IActorHttpOutput = await this.mediatorHttp.mediate({ context, input: sourceUriSmartKg });
+    const smartKgDataRaw = JSON.parse(await stringifyStream(ActorHttp.toNodeReadable(httpResponse.body)));
+    const smartKgData: ISmartKgData = {
+      // Convert predicate array to a hash for more efficient membership checking
+      families: smartKgDataRaw.families.map((family: any) => {
+        return {
+          name: family.name,
+          // Convert predicate array to a hash for more efficient membership checking
+          predicateSet: family.predicateSet.reduce((acc: any, v: any) => { acc[v] = true; return acc; }, {}),
+        };
+      }),
+      infrequentPredicates: smartKgDataRaw.infrequentPredicates
+        .reduce((acc: any, v: any) => { acc[v] = true; return acc; }, {}),
+    };
+
+    // Determine stars, and distribute them to SmartKG or TPF
+    const starPatternsSmartKg: Algebra.Pattern[][] = [];
+    let patternsTpf: Algebra.Pattern[] = [];
+    for (const starPattern of ActorQueryOperationBgpSmartkg.getStarPatterns(pattern)) {
+      if (ActorQueryOperationBgpSmartkg.isStarPatternSmartKg(starPattern, smartKgData)) {
+        starPatternsSmartKg.push(starPattern);
+      } else {
+        patternsTpf = patternsTpf.concat(starPattern);
+      }
+    }
+
+    // TODO: optimization: check if TPF returns 0, then return empty stream
+
+    // Execute each SmartKG star over the appropriate HDT files
+    const starResults: Promise<IActorQueryOperationOutputBindings>[] = starPatternsSmartKg
+      .map(async (starPattern) => {
+        // Determine the HDT files
+        const sources = await this.getStarPatternSmartKgSources(starPattern, smartKgData, sourceUriSmartKg, context);
+        const contextSmartKg = context.set(KEY_CONTEXT_SOURCES, sources);
+
+        // Create an execute the star as a BGP over the given sources
+        const bgp = algebraFactory.createBgp(starPattern);
+        return ActorQueryOperation.getSafeBindings(await this.mediatorQueryOperation
+          .mediate({ operation: bgp, context: contextSmartKg }));
+      });
+
+    // Execute all remaining patterns using TPF
+    if (patternsTpf.length > 0) {
+      const bgpTpf = algebraFactory.createBgp(patternsTpf);
+      starResults.push(this.mediatorQueryOperation.mediate({operation: bgpTpf, context})
+        .then(ActorQueryOperation.getSafeBindings));
+    }
+
+    // Join the results of both
+    return this.mediatorJoin.mediate({ entries: await Promise.all(starResults) });
+  }
+
+}
+
+export interface IActorQueryOperationBgpSmartkgArgs extends IActorQueryOperationTypedMediatedArgs {
+  mediatorHttp: Mediator<Actor<IActionHttp, IActorTest, IActorHttpOutput>,
+    IActionHttp, IActorTest, IActorHttpOutput>;
+  mediatorJoin: Mediator<ActorRdfJoin,
+    IActionRdfJoin, IMediatorTypeIterations, IActorQueryOperationOutput>;
+}
+
+export interface ISmartKgData {
+  infrequentPredicates: {[predicate: string]: boolean};
+  families: ISmartKgFamily[];
+}
+
+export interface ISmartKgFamily {
+  name: string;
+  predicateSet: {[predicate: string]: boolean};
+}
