@@ -31,6 +31,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     IActionHttp, IActorTest, IActorHttpOutput>;
   public readonly mediatorJoin: Mediator<ActorRdfJoin,
     IActionRdfJoin, IMediatorTypeIterations, IActorQueryOperationOutput>;
+  public readonly maxFamilies: number;
 
   private readonly cacheFolder: string;
 
@@ -171,9 +172,18 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
       this.logDebug(context, `Filtered down to ${families.length} SmartKG families.`);
     }
 
-    // TODO: if number of files too big (5), then offload to TPF (but shouldn't occur for watdiv)
+    // Optimization: skip handling when number of families is too large.
+    if (families.length > this.maxFamilies) {
+      this.logDebug(context, `Skipping SmartKG handling because number of families is above the threshold (${
+        this.maxFamilies}).`);
+      return null;
+    }
 
-    // TODO: if originalFamily, then offload to TPF
+    // Optimization: skip original families, as these are too large
+    if (families.some((family) => family.originalFamily)) {
+      this.logDebug(context, `Skipping SmartKG handling because we found an original family`);
+      return null;
+    }
 
     // Determine HDT files for all applicable families
     const hdtSources = [];
@@ -211,6 +221,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
         return {
           grouped: family.grouped,
           name: family.name,
+          originalFamily: family.originalFamily,
           // Convert predicate array to a hash for more efficient membership checking
           predicateSet: family.predicateSet.reduce((acc: any, v: any) => { acc[v] = true; return acc; }, {}),
         };
@@ -235,17 +246,21 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     // TODO: optimization: check if TPF returns 0, then return empty stream
 
     // Execute each SmartKG star over the appropriate HDT files
-    const starResults: Promise<IActorQueryOperationOutputBindings>[] = starPatternsSmartKg
-      .map(async (starPattern) => {
-        // Determine the HDT files
-        const sources = await this.getStarPatternSmartKgSources(starPattern, smartKgData, sourceUriSmartKg, context);
-        const contextSmartKg = context.set(KEY_CONTEXT_SOURCES, sources);
+    const starResults: Promise<IActorQueryOperationOutputBindings>[] = [];
+    for (const starPattern of starPatternsSmartKg) {
+      // Determine the HDT files
+      const sources = await this.getStarPatternSmartKgSources(starPattern, smartKgData, sourceUriSmartKg, context);
+      if (!sources) {
+        // If we received null, then this means that we are better off with delegating to TPF.
+        patternsTpf = patternsTpf.concat(starPattern);
+      }
 
-        // Create an execute the star as a BGP over the given sources
-        const bgp = algebraFactory.createBgp(starPattern);
-        return ActorQueryOperation.getSafeBindings(await this.mediatorQueryOperation
-          .mediate({ operation: bgp, context: contextSmartKg }));
-      });
+      // Create an execute the star as a BGP over the given sources
+      const contextSmartKg = context.set(KEY_CONTEXT_SOURCES, sources);
+      const bgp = algebraFactory.createBgp(starPattern);
+      starResults.push(this.mediatorQueryOperation.mediate({ operation: bgp, context: contextSmartKg })
+        .then(ActorQueryOperation.getSafeBindings));
+    }
 
     // Execute all remaining patterns using TPF
     if (patternsTpf.length > 0) {
@@ -266,6 +281,7 @@ export interface IActorQueryOperationBgpSmartkgArgs extends IActorQueryOperation
     IActionHttp, IActorTest, IActorHttpOutput>;
   mediatorJoin: Mediator<ActorRdfJoin,
     IActionRdfJoin, IMediatorTypeIterations, IActorQueryOperationOutput>;
+  maxFamilies: number;
 }
 
 export interface ISmartKgData {
@@ -277,6 +293,7 @@ export interface ISmartKgFamily {
   name: string;
   predicateSet: {[predicate: string]: boolean};
   grouped: boolean;
+  originalFamily: boolean;
 }
 
 /**
