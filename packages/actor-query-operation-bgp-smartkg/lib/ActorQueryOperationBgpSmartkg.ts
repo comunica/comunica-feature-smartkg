@@ -133,30 +133,60 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     }
     const predicates: string[] = Object.keys(predicatesHash);
 
-    // Determine the HDT files that contain *at least* all the given predicates
-    const hdtSources = [];
+    // Determine the families that contain *at least* all the given predicates
+    let families: ISmartKgFamily[] = [];
+    let atLeastOneGroupedFamily: boolean = false;
     for (const family of smartKgData.families) {
       if (predicates.every((predicate) => family.predicateSet[predicate])) {
-        hdtSources.push({ type: 'hdtFile', value: await this.fetchHdtFile(baseUri, family.name, context) });
+        families.push(family);
+        if (family.grouped) {
+          atLeastOneGroupedFamily = true;
+        }
       }
     }
 
-    // TODO: if one grouped, remove all non-grouped. otherwise keep using the non-grouped ones.
+    this.logDebug(context, `Found ${families.length} SmartKG families.`);
 
-    // TODO: only use the groups equal to min(size(group))
-    // A, B, C
-    // A, B
-    // A, C
-    // A, B, C, C
+    // If there is a family that is grouped, we can optimize
+    if (atLeastOneGroupedFamily) {
+      // Remove all non-grouped families
+      families = families.filter((family) => family.grouped);
+
+      // Determine the minimum group size within all families (group size is predicateSet size)
+      // Also collect those families with the minimum group size
+      let minGroupSize = Infinity;
+      let minGroupSizeFamilies: ISmartKgFamily[];
+      for (const family of families) {
+        const groupSize = Object.keys(family.predicateSet).length;
+        if (groupSize < minGroupSize) {
+          minGroupSize = groupSize;
+          minGroupSizeFamilies = [family];
+        } else if (groupSize === minGroupSize) {
+          minGroupSizeFamilies.push(family);
+        }
+      }
+
+      families = minGroupSizeFamilies;
+
+      this.logDebug(context, `Filtered down to ${families.length} SmartKG families.`);
+    }
 
     // TODO: if number of files too big (5), then offload to TPF (but shouldn't occur for watdiv)
 
     // TODO: if originalFamily, then offload to TPF
 
+    // Determine HDT files for all applicable families
+    const hdtSources = [];
+    for (const family of families) {
+      hdtSources.push({ type: 'hdtFile', value: await this.fetchHdtFile(baseUri, family.name, context) });
+    }
     return AsyncReiterableArray.fromFixedData(hdtSources);
   }
 
   public async testOperation(pattern: Algebra.Bgp, context: ActionContext): Promise<IActorTest> {
+    if (context.has(KEY_CONTEXT_SMARTKG_FLAG)) {
+      throw new Error('Actor ' + this.name + ' can only operate once on SmartKG BGPs.');
+    }
     if (pattern.patterns.length < 2) {
       throw new Error('Actor ' + this.name + ' can only operate on BGPs with at least two patterns.');
     }
@@ -179,6 +209,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
       // Convert predicate array to a hash for more efficient membership checking
       families: smartKgDataRaw.families.map((family: any) => {
         return {
+          grouped: family.grouped,
           name: family.name,
           // Convert predicate array to a hash for more efficient membership checking
           predicateSet: family.predicateSet.reduce((acc: any, v: any) => { acc[v] = true; return acc; }, {}),
@@ -198,6 +229,8 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
         patternsTpf = patternsTpf.concat(starPattern);
       }
     }
+    this.logDebug(context, `Identified ${starPatternsSmartKg.length} SmartKG star patterns and ${
+      patternsTpf.length} remaining triple patterns.`);
 
     // TODO: optimization: check if TPF returns 0, then return empty stream
 
@@ -216,8 +249,9 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
 
     // Execute all remaining patterns using TPF
     if (patternsTpf.length > 0) {
+      const contextTpf = context.set(KEY_CONTEXT_SMARTKG_FLAG, true);
       const bgpTpf = algebraFactory.createBgp(patternsTpf);
-      starResults.push(this.mediatorQueryOperation.mediate({operation: bgpTpf, context})
+      starResults.push(this.mediatorQueryOperation.mediate({ operation: bgpTpf, context: contextTpf })
         .then(ActorQueryOperation.getSafeBindings));
     }
 
@@ -242,4 +276,10 @@ export interface ISmartKgData {
 export interface ISmartKgFamily {
   name: string;
   predicateSet: {[predicate: string]: boolean};
+  grouped: boolean;
 }
+
+/**
+ * @type {string} Context flag for indicating when a BGP has been checked for SmartKG applicability.
+ */
+export const KEY_CONTEXT_SMARTKG_FLAG = '@comunica/actor-query-operation-bgp-smartkg:smartkg-passed';
