@@ -18,10 +18,11 @@ import {ActionContext, Actor, IActorTest, Mediator} from "@comunica/core";
 import {IMediatorTypeIterations} from "@comunica/mediatortype-iterations";
 import {EmptyIterator} from "asynciterator";
 import {AsyncReiterableArray} from "asyncreiterable";
-import {createWriteStream, existsSync, mkdirSync} from "fs";
+import {createReadStream, createWriteStream, existsSync, mkdirSync} from "fs";
 import {join} from "path";
 import {termToString} from "rdf-string";
 import {Algebra, Factory} from "sparqlalgebrajs";
+import {PassThrough} from "stream";
 import stringifyStream = require("stream-to-string");
 
 /**
@@ -106,6 +107,28 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     }
 
     return sourceUri;
+  }
+
+  public async fetchCached(uri: string, context: ActionContext): Promise<NodeJS.ReadableStream> {
+    // Determine the file location in the local file system.
+    const localPath: string = join(this.cacheFolder, encodeURIComponent(uri));
+
+    // If the file already exists, don't fetch it
+    if (existsSync(localPath)) {
+      return createReadStream(localPath);
+    }
+
+    // Fetch the URL
+    const httpResponse: IActorHttpOutput = await this.mediatorHttp.mediate({ context, input: uri });
+    const out = ActorHttp.toNodeReadable(httpResponse.body);
+
+    // Cache the stream
+    const body1 = out.pipe(new PassThrough());
+    const body2 = out.pipe(new PassThrough());
+    const writeStream = createWriteStream(localPath);
+    body1.pipe(writeStream);
+
+    return body2;
   }
 
   public async fetchHdtFile(baseUri: string, fileName: string, context: ActionContext): Promise<string> {
@@ -214,8 +237,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     const sourceUri = ActorQueryOperationBgpSmartkg.getSingleSmartKgSourceUri(context);
     const sourceUriSmartKg = sourceUri.replace('watdiv', 'molecule/watdiv'); // TODO: don't hardcode
     // TODO: fetch SmartKG metadata in test to validate earlier, and cache the response
-    const httpResponse: IActorHttpOutput = await this.mediatorHttp.mediate({ context, input: sourceUriSmartKg });
-    const smartKgDataRaw = JSON.parse(await stringifyStream(ActorHttp.toNodeReadable(httpResponse.body)));
+    const smartKgDataRaw = JSON.parse(await stringifyStream(await this.fetchCached(sourceUriSmartKg, context)));
     const smartKgData: ISmartKgData = {
       // Convert predicate array to a hash for more efficient membership checking
       families: smartKgDataRaw.families.map((family: any) => {
