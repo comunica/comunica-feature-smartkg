@@ -337,6 +337,11 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
           variables: [],
         };
       }
+
+      // Otherwise, close all streams
+      for (let i: number = 0; i < patternOutputs.length; i++) {
+        patternOutputs[i].bindingsStream.close();
+      }
     }
 
     // Execute each SmartKG star over the appropriate HDT files
