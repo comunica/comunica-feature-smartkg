@@ -38,6 +38,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
   public readonly maxFamilies: number;
 
   private readonly cacheFolder: string;
+  private readonly smartKgSources: {[uri: string]: string};
 
   constructor(args: IActorQueryOperationBgpSmartkgArgs) {
     super(args, 'bgp');
@@ -47,6 +48,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     if (!existsSync(this.cacheFolder)) {
       mkdirSync(this.cacheFolder);
     }
+    this.smartKgSources = {};
   }
 
   /**
@@ -90,7 +92,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
    * @param {ActionContext} context A context, possibly containing a SmartKG source.
    * @return {string} A SmartKG source URI.
    */
-  public static getSingleSmartKgSourceUri(context: ActionContext): string {
+  public getSingleSmartKgSourceUri(context: ActionContext): string {
     // Determine all current sources
     let sourceUri: string = null;
     if (context.has(KEY_CONTEXT_SOURCES)) {
@@ -116,14 +118,28 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     } else {
       return null;
     }
+    return this.getSmartKgSource(sourceUri);
+  }
 
-    // Check if the source is a SmartKG source
-    // TODO: do this with hypermedia in the future
-    if (sourceUri.indexOf('quantum') < 0) {
-      return null;
+  /**
+   * Determine the SmartKG source URI from the given (TPF) source URI.
+   * @param {string} sourceUri A TPF source URI.
+   * @return {string} A SmartKG source URI, or null if it is not a SmartKG source.
+   */
+  public getSmartKgSource(sourceUri: string): string {
+    // If cached, return from cache
+    if (sourceUri in this.smartKgSources) {
+      return this.smartKgSources[sourceUri];
     }
 
-    return sourceUri;
+    // TODO: do this with hypermedia in the future (fetch page, and find ex:smartKgIndex predicate link)
+    let smartKgSourceUri: string = null;
+    if (sourceUri.indexOf('quantum') >= 0) {
+      smartKgSourceUri = sourceUri.replace('watdiv', 'molecule/watdiv');
+      this.smartKgSources[sourceUri] = smartKgSourceUri;
+    }
+
+    return smartKgSourceUri;
   }
 
   /**
@@ -264,7 +280,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     if (pattern.patterns.length < 2) {
       throw new Error('Actor ' + this.name + ' can only operate on BGPs with at least two patterns.');
     }
-    if (!ActorQueryOperationBgpSmartkg.getSingleSmartKgSourceUri(context)) {
+    if (!this.getSingleSmartKgSourceUri(context)) {
       throw new Error('Actor ' + this.name + ' requires at least one SmartKG-enabled source.');
     }
     return { httpRequests: pattern.patterns.length }; // TODO: calc this based on number of HDT files + estimate TPF
@@ -274,9 +290,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     const algebraFactory = new Factory();
 
     // Determine SmartKG source
-    const sourceUri = ActorQueryOperationBgpSmartkg.getSingleSmartKgSourceUri(context);
-    const sourceUriSmartKg = sourceUri.replace('watdiv', 'molecule/watdiv'); // TODO: don't hardcode
-    // TODO: fetch SmartKG metadata in test to validate earlier, and cache the response
+    const sourceUriSmartKg = this.getSingleSmartKgSourceUri(context);
     const smartKgDataRaw = JSON.parse(await stringifyStream(await this.fetchCached(sourceUriSmartKg, context)));
     const smartKgData: ISmartKgData = {
       // Convert predicate array to a hash for more efficient membership checking
