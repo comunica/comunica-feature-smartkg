@@ -1,11 +1,12 @@
+import {ActorQueryOperationBgpLeftDeepSmallest} from "@comunica/actor-query-operation-bgp-left-deep-smallest";
 import {ActorHttp, IActionHttp, IActorHttpOutput} from "@comunica/bus-http";
 import {
   ActorQueryOperation,
   ActorQueryOperationTypedMediated,
   IActorQueryOperationOutput,
+  IActorQueryOperationOutputBindings,
   IActorQueryOperationTypedMediatedArgs,
 } from "@comunica/bus-query-operation";
-import {IActorQueryOperationOutputBindings} from "@comunica/bus-query-operation/lib/ActorQueryOperation";
 import {ActorRdfJoin, IActionRdfJoin} from "@comunica/bus-rdf-join";
 import {
   DataSources,
@@ -15,6 +16,7 @@ import {
 } from "@comunica/bus-rdf-resolve-quad-pattern";
 import {ActionContext, Actor, IActorTest, Mediator} from "@comunica/core";
 import {IMediatorTypeIterations} from "@comunica/mediatortype-iterations";
+import {EmptyIterator} from "asynciterator";
 import {AsyncReiterableArray} from "asyncreiterable";
 import {createWriteStream, existsSync, mkdirSync} from "fs";
 import {join} from "path";
@@ -31,6 +33,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     IActionHttp, IActorTest, IActorHttpOutput>;
   public readonly mediatorJoin: Mediator<ActorRdfJoin,
     IActionRdfJoin, IMediatorTypeIterations, IActorQueryOperationOutput>;
+  public readonly testEmptyPatterns: boolean;
   public readonly maxFamilies: number;
 
   private readonly cacheFolder: string;
@@ -203,7 +206,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     if (!ActorQueryOperationBgpSmartkg.getSingleSmartKgSourceUri(context)) {
       throw new Error('Actor ' + this.name + ' requires at least one SmartKG-enabled source.');
     }
-    return { httpRequests: pattern.patterns.length }; // TODO: estimate number of requests more exactly.
+    return { httpRequests: pattern.patterns.length }; // TODO: calc this based on number of HDT files + estimate TPF
   }
 
   public async runOperation(pattern: Algebra.Bgp, context: ActionContext): Promise<IActorQueryOperationOutput> {
@@ -243,7 +246,24 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     this.logDebug(context, `Identified ${starPatternsSmartKg.length} SmartKG star patterns and ${
       patternsTpf.length} remaining triple patterns.`);
 
-    // TODO: optimization: check if TPF returns 0, then return empty stream
+    // Check if any of the triple patterns returns 0 with TPF, then return empty stream
+    if (this.testEmptyPatterns) {
+      // Get the total number of items for all patterns by resolving the quad patterns
+      const patternOutputs: IActorQueryOperationOutputBindings[] = (await Promise.all(pattern.patterns
+        .map((subPattern: Algebra.Pattern) => this.mediatorQueryOperation.mediate(
+          { operation: subPattern, context }))))
+        .map(ActorQueryOperation.getSafeBindings);
+
+      // If a triple pattern has no matches, the entire graph pattern has no matches.
+      if (await ActorQueryOperationBgpLeftDeepSmallest.hasOneEmptyPatternOutput(patternOutputs)) {
+        return <IActorQueryOperationOutput> {
+          bindingsStream: new EmptyIterator(),
+          metadata: () => Promise.resolve({ totalItems: 0 }),
+          type: 'bindings',
+          variables: [],
+        };
+      }
+    }
 
     // Execute each SmartKG star over the appropriate HDT files
     const starResults: Promise<IActorQueryOperationOutputBindings>[] = [];
@@ -281,6 +301,7 @@ export interface IActorQueryOperationBgpSmartkgArgs extends IActorQueryOperation
     IActionHttp, IActorTest, IActorHttpOutput>;
   mediatorJoin: Mediator<ActorRdfJoin,
     IActionRdfJoin, IMediatorTypeIterations, IActorQueryOperationOutput>;
+  testEmptyPatterns: boolean;
   maxFamilies: number;
 }
 

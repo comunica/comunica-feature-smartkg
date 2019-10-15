@@ -25,6 +25,14 @@
           "unique": true
         },
         {
+          "@id": "caqobs:testEmptyPatterns",
+          "comment": "If the estimated count for all patterns should be checked for one empty one before further execution.",
+          "required": true,
+          "unique": true,
+          "range": "xsd:boolean",
+          "default": true
+        },
+        {
           "@id": "caqobs:maxFamilies",
           "comment": "The maximum number of families that are allowed to be fetched in one query execution (exclusive).",
           "required": true,
@@ -45,6 +53,10 @@
             {
               "keyRaw": "mediatorJoin",
               "value": "caqobs:mediatorJoin"
+            },
+            {
+              "keyRaw": "testEmptyPatterns",
+              "value": "caqobs:testEmptyPatterns"
             },
             {
               "keyRaw": "maxFamilies",
