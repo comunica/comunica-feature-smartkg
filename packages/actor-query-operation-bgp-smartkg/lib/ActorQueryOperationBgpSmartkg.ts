@@ -189,10 +189,8 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     }
 
     // Determine HDT files for all applicable families
-    const hdtSources = [];
-    for (const family of families) {
-      hdtSources.push({ type: 'hdtFile', value: await this.fetchHdtFile(baseUri, family.name, context) });
-    }
+    const hdtSources = await Promise.all(families.map(async (family) =>
+      ({ type: 'hdtFile', value: await this.fetchHdtFile(baseUri, family.name, context) })));
     return AsyncReiterableArray.fromFixedData(hdtSources);
   }
 
