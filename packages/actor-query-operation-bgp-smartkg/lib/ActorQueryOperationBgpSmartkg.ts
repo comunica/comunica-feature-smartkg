@@ -49,6 +49,11 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     }
   }
 
+  /**
+   * Determine all star patterns inside the given BGP.
+   * @param {Bgp} pattern a BGP pattern.
+   * @return {Pattern[][]} A double array of quad patterns, grouped as separate star pattern.
+   */
   public static getStarPatterns(pattern: Algebra.Bgp): Algebra.Pattern[][] {
     const stars: {[subject: string]: Algebra.Pattern[]} = {};
     for (const quadPattern of pattern.patterns) {
@@ -61,6 +66,12 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     return Object.keys(stars).map((key) => stars[key]);
   }
 
+  /**
+   * Check if the given star pattern should be handled by SmartKG.
+   * @param {Pattern[]} patterns A star pattern.
+   * @param {ISmartKgData} smartKgData A SmartKG index.
+   * @return {boolean} If the given star pattern should be handled by SmartKG.
+   */
   public static isStarPatternSmartKg(patterns: Algebra.Pattern[], smartKgData: ISmartKgData): boolean {
     if (patterns.length === 1) {
       return false;
@@ -73,6 +84,12 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     return true;
   }
 
+  /**
+   * If present, get the SmartKG source from the current context.
+   * If multiple sources are present, or a non-SmartKG source is present, then null will be returned.
+   * @param {ActionContext} context A context, possibly containing a SmartKG source.
+   * @return {string} A SmartKG source URI.
+   */
   public static getSingleSmartKgSourceUri(context: ActionContext): string {
     // Determine all current sources
     let sourceUri: string = null;
@@ -109,6 +126,13 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     return sourceUri;
   }
 
+  /**
+   * Either retrieve the given URI from local cache,
+   * or fetch and cache it.
+   * @param {string} uri A URI.
+   * @param {ActionContext} context A context.
+   * @return {Promise<NodeJS.ReadableStream>} A promise resolving to the cached or fetched stream.
+   */
   public async fetchCached(uri: string, context: ActionContext): Promise<NodeJS.ReadableStream> {
     // Determine the file location in the local file system.
     const localPath: string = join(this.cacheFolder, encodeURIComponent(uri));
@@ -131,6 +155,14 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     return body2;
   }
 
+  /**
+   * Either retrieve the given HDT file from local cache,
+   * or fetch and cache it.
+   * @param {string} baseUri A base IRI.
+   * @param {string} fileName A relative HDT file name.
+   * @param {ActionContext} context A context.
+   * @return {Promise<string>} A promise resolving to a local file name.
+   */
   public async fetchHdtFile(baseUri: string, fileName: string, context: ActionContext): Promise<string> {
     // Determine the file location in the local file system.
     const localPath: string = join(this.cacheFolder, fileName);
@@ -151,6 +183,14 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     });
   }
 
+  /**
+   * Determine the HDT data sources for the given SmartKG star pattern.
+   * @param {Pattern[]} patterns A star pattern containing quad patterns.
+   * @param {ISmartKgData} smartKgData A SmartKG index.
+   * @param {string} baseUri The SmartKG base URI.
+   * @param {ActionContext} context A context.
+   * @return {Promise<DataSources>} A promise resolving to HDT data source definitions.
+   */
   public async getStarPatternSmartKgSources(patterns: Algebra.Pattern[], smartKgData: ISmartKgData,
                                             baseUri: string, context: ActionContext): Promise<DataSources> {
     // Determine all predicates of the star pattern
