@@ -4,6 +4,8 @@
   "@type": "Module",
   "requireName": "@comunica/actor-query-operation-bgp-smartkg",
   "import": [
-    "files-caqobs:components/Actor/QueryOperation/BgpSmartkg.jsonld"
+    "files-caqobs:components/Actor/QueryOperation/BgpSmartkgAdapter.jsonld",
+    "files-caqobs:components/Actor/QueryOperation/BgpSmartkgDeepJoin.jsonld",
+    "files-caqobs:components/Actor/QueryOperation/BgpSmartkgStarJoin.jsonld"
   ]
 }

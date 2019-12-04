@@ -11,7 +11,7 @@
   "actors": [
     {
       "@id": "config-caisskg:sparql-queryoperators.json#mySmartkgBgpQueryOperator",
-      "@type": "ActorQueryOperationBgpSmartkg",
+      "@type": "ActorQueryOperationBgpSmartkgDeepJoin",
       "cbqo:mediatorQueryOperation": { "@id": "config-sets:sparql-queryoperators.json#mediatorQueryOperation" },
       "caqobs:mediatorHttp": { "@id": "config-sets:http.json#mediatorHttp" },
       "caqobs:mediatorJoin": { "@id": "config-sets:sparql-queryoperators.json#mediatorRdfJoin" },

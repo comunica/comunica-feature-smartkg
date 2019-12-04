@@ -6,7 +6,9 @@
       "caqobs": "npmd:@comunica/actor-query-operation-bgp-smartkg/",
       "files-caqobs": "caqobs:^1.0.0/",
 
-      "ActorQueryOperationBgpSmartkg": "caqobs:Actor/QueryOperation/BgpSmartkg"
+      "ActorQueryOperationBgpSmartkgAdapter": "caqobs:Actor/QueryOperation/BgpSmartkgAdapter",
+      "ActorQueryOperationBgpSmartkgDeepJoin": "caqobs:Actor/QueryOperation/BgpSmartkgDeepJoin",
+      "ActorQueryOperationBgpSmartkgStarJoin": "caqobs:Actor/QueryOperation/BgpSmartkgStarJoin"
     }
   ]
 }

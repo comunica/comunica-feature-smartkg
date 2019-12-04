@@ -2,7 +2,7 @@ import {ActorQueryOperation, Bindings} from "@comunica/bus-query-operation";
 import {Bus} from "@comunica/core";
 import {ArrayIterator} from "asynciterator";
 import {literal, variable} from "@rdfjs/data-model";
-import {ActorQueryOperationBgpSmartkg} from "../lib/ActorQueryOperationBgpSmartkg";
+import {ActorQueryOperationBgpSmartkgAdapter} from "../lib/ActorQueryOperationBgpSmartkg";
 const arrayifyStream = require('arrayify-stream');
 
 describe('ActorQueryOperationBgpSmartkg', () => {
@@ -28,26 +28,26 @@ describe('ActorQueryOperationBgpSmartkg', () => {
 
   describe('The ActorQueryOperationBgpSmartkg module', () => {
     it('should be a function', () => {
-      expect(ActorQueryOperationBgpSmartkg).toBeInstanceOf(Function);
+      expect(ActorQueryOperationBgpSmartkgAdapter).toBeInstanceOf(Function);
     });
 
     it('should be a ActorQueryOperationBgpSmartkg constructor', () => {
-      expect(new (<any> ActorQueryOperationBgpSmartkg)({ name: 'actor', bus, mediatorQueryOperation }))
-        .toBeInstanceOf(ActorQueryOperationBgpSmartkg);
-      expect(new (<any> ActorQueryOperationBgpSmartkg)({ name: 'actor', bus, mediatorQueryOperation }))
+      expect(new (<any> ActorQueryOperationBgpSmartkgAdapter)({ name: 'actor', bus, mediatorQueryOperation }))
+        .toBeInstanceOf(ActorQueryOperationBgpSmartkgAdapter);
+      expect(new (<any> ActorQueryOperationBgpSmartkgAdapter)({ name: 'actor', bus, mediatorQueryOperation }))
         .toBeInstanceOf(ActorQueryOperation);
     });
 
     it('should not be able to create new ActorQueryOperationBgpSmartkg objects without \'new\'', () => {
-      expect(() => { (<any> ActorQueryOperationBgpSmartkg)(); }).toThrow();
+      expect(() => { (<any> ActorQueryOperationBgpSmartkgAdapter)(); }).toThrow();
     });
   });
 
   describe('An ActorQueryOperationBgpSmartkg instance', () => {
-    let actor: ActorQueryOperationBgpSmartkg;
+    let actor: ActorQueryOperationBgpSmartkgAdapter;
 
     beforeEach(() => {
-      actor = new ActorQueryOperationBgpSmartkg({ name: 'actor', bus, mediatorQueryOperation });
+      actor = new ActorQueryOperationBgpSmartkgAdapter({ name: 'actor', bus, mediatorQueryOperation });
     });
 
     it('should test on bgp', () => {

@@ -21,14 +21,14 @@ import {AsyncReiterableArray} from "asyncreiterable";
 import {createReadStream, createWriteStream, existsSync, mkdirSync} from "fs";
 import {join} from "path";
 import {termToString} from "rdf-string";
-import {Algebra, Factory} from "sparqlalgebrajs";
+import {Algebra} from "sparqlalgebrajs";
 import {PassThrough} from "stream";
 import stringifyStream = require("stream-to-string");
 
 /**
  * A comunica BGP SmartKG Query Operation Actor.
  */
-export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMediated<Algebra.Bgp> {
+export abstract class ActorQueryOperationBgpSmartkgAdapter extends ActorQueryOperationTypedMediated<Algebra.Bgp> {
 
   public readonly mediatorHttp: Mediator<Actor<IActionHttp, IActorTest, IActorHttpOutput>,
     IActionHttp, IActorTest, IActorHttpOutput>;
@@ -38,7 +38,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
   public readonly maxFamilies: number;
 
   private readonly cacheFolder: string;
-  private readonly smartKgSources: {[uri: string]: string};
+  private readonly smartKgSources: { [uri: string]: string };
 
   constructor(args: IActorQueryOperationBgpSmartkgArgs) {
     super(args, 'bgp');
@@ -57,7 +57,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
    * @return {Pattern[][]} A double array of quad patterns, grouped as separate star pattern.
    */
   public static getStarPatterns(pattern: Algebra.Bgp): Algebra.Pattern[][] {
-    const stars: {[subject: string]: Algebra.Pattern[]} = {};
+    const stars: { [subject: string]: Algebra.Pattern[] } = {};
     for (const quadPattern of pattern.patterns) {
       const subjectKey = termToString(quadPattern.subject);
       if (!stars[subjectKey]) {
@@ -159,7 +159,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     }
 
     // Fetch the URL
-    const httpResponse: IActorHttpOutput = await this.mediatorHttp.mediate({ context, input: uri });
+    const httpResponse: IActorHttpOutput = await this.mediatorHttp.mediate({context, input: uri});
     const out = ActorHttp.toNodeReadable(httpResponse.body);
 
     // Cache the stream
@@ -189,7 +189,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     }
 
     // Otherwise, fetch it and store it into our cache
-    const httpResponse = await this.mediatorHttp.mediate({ context, input: baseUri + '/' + fileName });
+    const httpResponse = await this.mediatorHttp.mediate({context, input: baseUri + '/' + fileName});
     const bodyStream = ActorHttp.toNodeReadable(httpResponse.body);
     return new Promise((resolve, reject) => {
       bodyStream
@@ -210,7 +210,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
   public async getStarPatternSmartKgSources(patterns: Algebra.Pattern[], smartKgData: ISmartKgData,
                                             baseUri: string, context: ActionContext): Promise<DataSources> {
     // Determine all predicates of the star pattern
-    const predicatesHash: {[predicate: string]: boolean} = {};
+    const predicatesHash: { [predicate: string]: boolean } = {};
     for (const pattern of patterns) {
       predicatesHash[termToString(pattern.predicate)] = true;
     }
@@ -269,7 +269,7 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
 
     // Determine HDT files for all applicable families
     const hdtSources = await Promise.all(families.map(async (family) =>
-      ({ type: 'hdtFile', value: await this.fetchHdtFile(baseUri, family.name, context) })));
+      ({type: 'hdtFile', value: await this.fetchHdtFile(baseUri, family.name, context)})));
     return AsyncReiterableArray.fromFixedData(hdtSources);
   }
 
@@ -283,12 +283,10 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
     if (!this.getSingleSmartKgSourceUri(context)) {
       throw new Error('Actor ' + this.name + ' requires at least one SmartKG-enabled source.');
     }
-    return { httpRequests: pattern.patterns.length }; // TODO: calc this based on number of HDT files + estimate TPF
+    return {httpRequests: pattern.patterns.length}; // TODO: calc this based on number of HDT files + estimate TPF
   }
 
   public async runOperation(pattern: Algebra.Bgp, context: ActionContext): Promise<IActorQueryOperationOutput> {
-    const algebraFactory = new Factory();
-
     // Determine SmartKG source
     const sourceUriSmartKg = this.getSingleSmartKgSourceUri(context);
     const smartKgDataRaw = JSON.parse(await stringifyStream(await this.fetchCached(sourceUriSmartKg, context)));
@@ -300,18 +298,24 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
           name: family.name,
           originalFamily: family.originalFamily,
           // Convert predicate array to a hash for more efficient membership checking
-          predicateSet: family.predicateSet.reduce((acc: any, v: any) => { acc[v] = true; return acc; }, {}),
+          predicateSet: family.predicateSet.reduce((acc: any, v: any) => {
+            acc[v] = true;
+            return acc;
+          }, {}),
         };
       }),
       infrequentPredicates: smartKgDataRaw.infrequentPredicates
-        .reduce((acc: any, v: any) => { acc[v] = true; return acc; }, {}),
+        .reduce((acc: any, v: any) => {
+          acc[v] = true;
+          return acc;
+        }, {}),
     };
 
     // Determine stars, and distribute them to SmartKG or TPF
     const starPatternsSmartKg: Algebra.Pattern[][] = [];
     let patternsTpf: Algebra.Pattern[] = [];
-    for (const starPattern of ActorQueryOperationBgpSmartkg.getStarPatterns(pattern)) {
-      if (ActorQueryOperationBgpSmartkg.isStarPatternSmartKg(starPattern, smartKgData)) {
+    for (const starPattern of ActorQueryOperationBgpSmartkgAdapter.getStarPatterns(pattern)) {
+      if (ActorQueryOperationBgpSmartkgAdapter.isStarPatternSmartKg(starPattern, smartKgData)) {
         starPatternsSmartKg.push(starPattern);
       } else {
         patternsTpf = patternsTpf.concat(starPattern);
@@ -325,14 +329,14 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
       // Get the total number of items for all patterns by resolving the quad patterns
       const patternOutputs: IActorQueryOperationOutputBindings[] = (await Promise.all(pattern.patterns
         .map((subPattern: Algebra.Pattern) => this.mediatorQueryOperation.mediate(
-          { operation: subPattern, context }))))
+          {operation: subPattern, context}))))
         .map(ActorQueryOperation.getSafeBindings);
 
       // If a triple pattern has no matches, the entire graph pattern has no matches.
       if (await ActorQueryOperationBgpLeftDeepSmallest.hasOneEmptyPatternOutput(patternOutputs)) {
         return <IActorQueryOperationOutput> {
           bindingsStream: new EmptyIterator(),
-          metadata: () => Promise.resolve({ totalItems: 0 }),
+          metadata: () => Promise.resolve({totalItems: 0}),
           type: 'bindings',
           variables: [],
         };
@@ -344,34 +348,14 @@ export class ActorQueryOperationBgpSmartkg extends ActorQueryOperationTypedMedia
       }
     }
 
-    // Execute each SmartKG star over the appropriate HDT files
-    const starResults: Promise<IActorQueryOperationOutputBindings>[] = [];
-    for (const starPattern of starPatternsSmartKg) {
-      // Determine the HDT files
-      const sources = await this.getStarPatternSmartKgSources(starPattern, smartKgData, sourceUriSmartKg, context);
-      if (!sources) {
-        // If we received null, then this means that we are better off with delegating to TPF.
-        patternsTpf = patternsTpf.concat(starPattern);
-      }
-
-      // Create an execute the star as a BGP over the given sources
-      const contextSmartKg = context.set(KEY_CONTEXT_SOURCES, sources);
-      const bgp = algebraFactory.createBgp(starPattern);
-      starResults.push(this.mediatorQueryOperation.mediate({ operation: bgp, context: contextSmartKg })
-        .then(ActorQueryOperation.getSafeBindings));
-    }
-
-    // Execute all remaining patterns using TPF
-    if (patternsTpf.length > 0) {
-      const contextTpf = context.set(KEY_CONTEXT_SMARTKG_FLAG, true);
-      const bgpTpf = algebraFactory.createBgp(patternsTpf);
-      starResults.push(this.mediatorQueryOperation.mediate({ operation: bgpTpf, context: contextTpf })
-        .then(ActorQueryOperation.getSafeBindings));
-    }
-
-    // Join the results of both
-    return this.mediatorJoin.mediate({ entries: await Promise.all(starResults) });
+    return await this.executePatterns(starPatternsSmartKg, patternsTpf, smartKgData,
+      sourceUriSmartKg, context, pattern);
   }
+
+  protected abstract executePatterns(starPatternsSmartKg: Algebra.Pattern[][], patternsTpf: Algebra.Pattern[],
+                                     smartKgData: ISmartKgData, sourceUriSmartKg: string, context: ActionContext,
+                                     patternOriginal: Algebra.Bgp)
+    : Promise<IActorQueryOperationOutput>;
 
 }
 

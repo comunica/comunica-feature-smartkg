@@ -1,0 +1,22 @@
+{
+  "@context": [
+    "https://linkedsoftwaredependencies.org/bundles/npm/@comunica/actor-query-operation-bgp-smartkg/^1.0.0/components/context.jsonld",
+    "https://linkedsoftwaredependencies.org/bundles/npm/@comunica/bus-query-operation/^1.0.0/components/context.jsonld"
+  ],
+  "@id": "npmd:@comunica/actor-query-operation-bgp-smartkg",
+  "components": [
+    {
+      "@id": "caqobs:Actor/QueryOperation/BgpSmartkgStarJoin",
+      "@type": "Class",
+      "extends": "caqobs:Actor/QueryOperation/BgpSmartkgAdapter",
+      "requireElement": "ActorQueryOperationBgpSmartkgStarJoin",
+      "comment": "An comunica BGP SmartKG Query Operation Actor that does a star pattern join.",
+      "constructorArguments": [
+        {
+          "@id": "caqobs:Actor/QueryOperation/BgpSmartkgStarJoin/constructorArgumentsObject",
+          "extends": "caqobs:Actor/QueryOperation/BgpSmartkgAdapter/constructorArgumentsObject"
+        }
+      ]
+    }
+  ]
+}

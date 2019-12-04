@@ -6,11 +6,11 @@
   "@id": "npmd:@comunica/actor-query-operation-bgp-smartkg",
   "components": [
     {
-      "@id": "caqobs:Actor/QueryOperation/BgpSmartkg",
-      "@type": "Class",
+      "@id": "caqobs:Actor/QueryOperation/BgpSmartkgAdapter",
+      "@type": "AbstractClass",
       "extends": "cbqo:Actor/QueryOperationTypedMediated",
-      "requireElement": "ActorQueryOperationBgpSmartkg",
-      "comment": "A comunica BGP SmartKG Query Operation Actor.",
+      "requireElement": "ActorQueryOperationBgpSmartkgAdapter",
+      "comment": "An abstract comunica BGP SmartKG Query Operation Actor.",
       "parameters": [
         {
           "@id": "caqobs:mediatorHttp",
@@ -43,7 +43,7 @@
       ],
       "constructorArguments": [
         {
-          "@id": "caqobs:Actor/QueryOperation/BgpSmartkg/constructorArgumentsObject",
+          "@id": "caqobs:Actor/QueryOperation/BgpSmartkgAdapter/constructorArgumentsObject",
           "extends": "cbqo:Actor/QueryOperationTypedMediated/constructorArgumentsObject",
           "fields": [
             {
