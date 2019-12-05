@@ -39,6 +39,14 @@
           "unique": true,
           "range": "xsd:integer",
           "default": 5
+        },
+        {
+          "@id": "caqobs:fetchHdtIndexFiles",
+          "comment": "If the HDT index files should be fetched from the server, otherwise they will be created locally at query time.",
+          "required": true,
+          "unique": true,
+          "range": "xsd:boolean",
+          "default": true
         }
       ],
       "constructorArguments": [
@@ -61,6 +69,10 @@
             {
               "keyRaw": "maxFamilies",
               "value": "caqobs:maxFamilies"
+            },
+            {
+              "keyRaw": "fetchHdtIndexFiles",
+              "value": "caqobs:fetchHdtIndexFiles"
             }
           ]
         }

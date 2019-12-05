@@ -36,6 +36,7 @@ export abstract class ActorQueryOperationBgpSmartkgAdapter extends ActorQueryOpe
     IActionRdfJoin, IMediatorTypeIterations, IActorQueryOperationOutput>;
   public readonly testEmptyPatterns: boolean;
   public readonly maxFamilies: number;
+  public readonly fetchHdtIndexFiles: boolean;
 
   private readonly cacheFolder: string;
   private readonly smartKgSources: { [uri: string]: string };
@@ -145,6 +146,39 @@ export abstract class ActorQueryOperationBgpSmartkgAdapter extends ActorQueryOpe
   /**
    * Either retrieve the given URI from local cache,
    * or fetch and cache it.
+   *
+   * It will return the cached file name.
+   *
+   * @param {string} uri A URI.
+   * @param {ActionContext} context A context.
+   * @return {Promise<string>} A promise resolving to the cached file name.
+   */
+  public async fetchCachedLocation(uri: string, context: ActionContext): Promise<string> {
+    // Determine the file location in the local file system.
+    const localPath: string = join(this.cacheFolder, encodeURIComponent(uri));
+
+    // If the file already exists, don't fetch it
+    if (existsSync(localPath)) {
+      return localPath;
+    }
+
+    // Fetch the URL
+    const httpResponse: IActorHttpOutput = await this.mediatorHttp.mediate({context, input: uri});
+    const out = ActorHttp.toNodeReadable(httpResponse.body);
+
+    return new Promise<string>((resolve, reject) => {
+      out.pipe(createWriteStream(localPath))
+        .on('error', reject)
+        .on('finish', () => resolve(localPath));
+    });
+  }
+
+  /**
+   * Either retrieve the given URI from local cache,
+   * or fetch and cache it.
+   *
+   * It will return a read stream to the cached file.
+   *
    * @param {string} uri A URI.
    * @param {ActionContext} context A context.
    * @return {Promise<NodeJS.ReadableStream>} A promise resolving to the cached or fetched stream.
@@ -180,23 +214,19 @@ export abstract class ActorQueryOperationBgpSmartkgAdapter extends ActorQueryOpe
    * @return {Promise<string>} A promise resolving to a local file name.
    */
   public async fetchHdtFile(baseUri: string, fileName: string, context: ActionContext): Promise<string> {
-    // Determine the file location in the local file system.
-    const localPath: string = join(this.cacheFolder, fileName);
-
-    // If the file already exists, don't fetch it
-    if (existsSync(localPath)) {
-      return localPath;
+    // Fetch HDT index file
+    let fetchIndexPromise: Promise<string>;
+    if (this.fetchHdtIndexFiles) {
+      fetchIndexPromise = this.fetchCachedLocation(baseUri + '/' + fileName + '.index.v1-1', context);
+    } else {
+      fetchIndexPromise = new Promise((resolve) => resolve(''));
     }
 
-    // Otherwise, fetch it and store it into our cache
-    const httpResponse = await this.mediatorHttp.mediate({context, input: baseUri + '/' + fileName});
-    const bodyStream = ActorHttp.toNodeReadable(httpResponse.body);
-    return new Promise((resolve, reject) => {
-      bodyStream
-        .pipe(createWriteStream(localPath))
-        .on('error', reject)
-        .on('finish', () => resolve(localPath));
-    });
+    // Fetch HDT file
+    const fetchHdtPromise = this.fetchCachedLocation(baseUri + '/' + fileName, context);
+
+    const [_, localPath] = await Promise.all([fetchIndexPromise, fetchHdtPromise]);
+    return localPath;
   }
 
   /**
