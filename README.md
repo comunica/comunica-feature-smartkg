@@ -8,7 +8,8 @@ This is a monorepo that contains packages for allowing [Comunica](https://github
 If you want to _use_ an SmartKG-enabled Comunica engine, have a look at [Comunica SPARQL SmartKG](https://github.com/comunica/comunica-feature-smartkg/tree/master/packages/actor-init-sparql-smartkg).
 
 Concretely, this monorepo adds SmartKG support to Comunica using the following packages:
-TODO
+* [Comunica SPARQL AMF Init Actor](https://github.com/comunica/comunica-feature-smartkg/tree/master/packages/actor-init-sparql-smartkg): Init actor for query against SmartKG servers.
+* [Comunica BGP SmartKG Query Operation Actor](https://github.com/comunica/comunica-feature-smartkg/tree/master/packages/actor-query-operation-bgp-smartkg): A BGP SmartKG query operation actor.
 
 ## Development Setup
 
