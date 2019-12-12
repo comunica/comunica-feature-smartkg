@@ -1,9 +1,8 @@
 import {ActorQueryOperation, Bindings} from "@comunica/bus-query-operation";
 import {Bus} from "@comunica/core";
+import {literal} from "@rdfjs/data-model";
 import {ArrayIterator} from "asynciterator";
-import {literal, variable} from "@rdfjs/data-model";
-import {ActorQueryOperationBgpSmartkgAdapter} from "../lib/ActorQueryOperationBgpSmartkg";
-const arrayifyStream = require('arrayify-stream');
+import {ActorQueryOperationBgpSmartkgAdapter} from "../lib/ActorQueryOperationBgpSmartkgAdapter";
 
 describe('ActorQueryOperationBgpSmartkg', () => {
   let bus;
@@ -40,29 +39,6 @@ describe('ActorQueryOperationBgpSmartkg', () => {
 
     it('should not be able to create new ActorQueryOperationBgpSmartkg objects without \'new\'', () => {
       expect(() => { (<any> ActorQueryOperationBgpSmartkgAdapter)(); }).toThrow();
-    });
-  });
-
-  describe('An ActorQueryOperationBgpSmartkg instance', () => {
-    let actor: ActorQueryOperationBgpSmartkgAdapter;
-
-    beforeEach(() => {
-      actor = new ActorQueryOperationBgpSmartkgAdapter({ name: 'actor', bus, mediatorQueryOperation });
-    });
-
-    it('should test on bgp', () => {
-      const op = { operation: { type: 'bgp' } };
-      return expect(actor.test(op)).resolves.toBeTruthy();
-    });
-
-    it('should not test on non-bgp', () => {
-      const op = { operation: { type: 'some-other-type' } };
-      return expect(actor.test(op)).rejects.toBeTruthy();
-    });
-
-    it('should run', () => {
-      const op = { operation: { type: 'bgp' } };
-      return expect(actor.run(op)).resolves.toMatchObject({ todo: true }); // TODO
     });
   });
 });

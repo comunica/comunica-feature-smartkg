@@ -373,8 +373,8 @@ export abstract class ActorQueryOperationBgpSmartkgAdapter extends ActorQueryOpe
       }
 
       // Otherwise, close all streams
-      for (let i: number = 0; i < patternOutputs.length; i++) {
-        patternOutputs[i].bindingsStream.close();
+      for (const patternOutput of patternOutputs) {
+        patternOutput.bindingsStream.close();
       }
     }
 
