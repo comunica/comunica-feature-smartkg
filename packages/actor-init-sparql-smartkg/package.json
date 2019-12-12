@@ -42,12 +42,12 @@
     "engine-default.js"
   ],
   "dependencies": {
-    "@comunica/actor-init-sparql": "^1.9.3",
+    "@comunica/actor-init-sparql": "^1.10.0",
     "@comunica/actor-query-operation-bgp-smartkg": "^1.0.0",
-    "@comunica/actor-http-node-fetch": "^1.9.3",
+    "@comunica/actor-http-node-fetch": "^1.10.0",
     "@comunica/actor-rdf-resolve-quad-pattern-hdt": "^1.5.0",
-    "@comunica/runner": "^1.9.2",
-    "@comunica/runner-cli": "^1.9.2"
+    "@comunica/runner": "^1.9.4",
+    "@comunica/runner-cli": "^1.9.4"
   },
   "scripts": {
     "lint": "node \"../../node_modules/tslint/bin/tslint\" lib/**/*.ts test/**/*.ts --exclude '**/*.d.ts'",
