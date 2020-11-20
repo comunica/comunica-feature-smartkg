@@ -10,7 +10,11 @@
   },
   "main": "index.js",
   "typings": "index",
-  "repository": "https://github.com/comunica/comunica-feature-smartkg/tree/master/packages/actor-init-sparql-smartkg",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/comunica/comunica-feature-smartkg.git",
+    "directory": "packages/actor-init-sparql-smartkg"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -30,7 +34,7 @@
   "bugs": {
     "url": "https://github.com/comunica/comunica/issues"
   },
-  "homepage": "https://github.com/comunica/comunica#readme",
+  "homepage": "https://comunica.dev/",
   "files": [
     "config",
     "bin/**/*.d.ts",
@@ -42,15 +46,14 @@
     "engine-default.js"
   ],
   "dependencies": {
-    "@comunica/actor-init-sparql": "^1.10.0",
+    "@comunica/actor-init-sparql": "^1.18.0",
     "@comunica/actor-query-operation-bgp-smartkg": "^1.0.0",
-    "@comunica/actor-http-node-fetch": "^1.10.0",
-    "@comunica/actor-rdf-resolve-quad-pattern-hdt": "^1.5.0",
-    "@comunica/runner": "^1.9.4",
-    "@comunica/runner-cli": "^1.9.4"
+    "@comunica/actor-http-node-fetch": "^1.18.0",
+    "@comunica/actor-rdf-resolve-quad-pattern-hdt": "^1.7.0",
+    "@comunica/runner": "^1.18.0",
+    "@comunica/runner-cli": "^1.18.0"
   },
   "scripts": {
-    "lint": "node \"../../node_modules/tslint/bin/tslint\" lib/**/*.ts test/**/*.ts --exclude '**/*.d.ts'",
     "build": "node \"../../node_modules/typescript/bin/tsc\"",
     "validate": "npm ls",
     "prepare": "comunica-compile-config config/config-default.json > engine-default.js"

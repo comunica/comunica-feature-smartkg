@@ -6,7 +6,7 @@ ENV dir /var/www/@comunica/actor-init-sparql-smartkg/
 # Copy the engine files (generated from package.json!files)
 COPY config ${dir}/config/
 COPY bin/*.js ${dir}/bin/
-COPY index.js index-browser.js engine-default.js package.json ${dir}
+COPY index.js engine-default.js package.json ${dir}
 
 # Set the npm registry
 ARG NPM_REGISTRY=https://registry.npmjs.org/

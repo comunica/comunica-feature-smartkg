@@ -1,26 +1,28 @@
-import {ActorQueryOperation, Bindings} from "@comunica/bus-query-operation";
-import {Bus} from "@comunica/core";
-import {literal} from "@rdfjs/data-model";
-import {ArrayIterator} from "asynciterator";
-import {ActorQueryOperationBgpSmartkgAdapter} from "../lib/ActorQueryOperationBgpSmartkgAdapter";
+import { ActorQueryOperation, Bindings } from '@comunica/bus-query-operation';
+import { Bus } from '@comunica/core';
+import { ArrayIterator } from 'asynciterator';
+import { DataFactory } from 'rdf-data-factory';
+import { ActorQueryOperationBgpSmartkgAdapter } from '../lib/ActorQueryOperationBgpSmartkgAdapter';
+
+const DF = new DataFactory();
 
 describe('ActorQueryOperationBgpSmartkg', () => {
-  let bus;
-  let mediatorQueryOperation;
+  let bus: any;
+  let mediatorQueryOperation: any;
 
   beforeEach(() => {
     bus = new Bus({ name: 'bus' });
     mediatorQueryOperation = {
-      mediate: (arg) => Promise.resolve({
+      mediate: (arg: any) => Promise.resolve({
         bindingsStream: new ArrayIterator([
-          Bindings({ a: literal('1') }),
-          Bindings({ a: literal('2') }),
-          Bindings({ a: literal('3') }),
+          Bindings({ a: DF.literal('1') }),
+          Bindings({ a: DF.literal('2') }),
+          Bindings({ a: DF.literal('3') }),
         ]),
         metadata: () => Promise.resolve({ totalItems: 3 }),
         operated: arg,
         type: 'bindings',
-        variables: ['a'],
+        variables: [ 'a' ],
       }),
     };
   });

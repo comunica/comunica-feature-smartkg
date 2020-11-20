@@ -1,16 +1,17 @@
+import type { IActorQueryOperationOutput,
+  IActorQueryOperationOutputBindings } from '@comunica/bus-query-operation';
 import {
   ActorQueryOperation,
-  IActorQueryOperationOutput,
-  IActorQueryOperationOutputBindings,
-} from "@comunica/bus-query-operation";
-import {KEY_CONTEXT_SOURCES} from "@comunica/bus-rdf-resolve-quad-pattern";
-import {ActionContext} from "@comunica/core";
-import {Algebra, Factory} from "sparqlalgebrajs";
+} from '@comunica/bus-query-operation';
+import { KEY_CONTEXT_SOURCES } from '@comunica/bus-rdf-resolve-quad-pattern';
+import type { ActionContext } from '@comunica/core';
+import type { Algebra } from 'sparqlalgebrajs';
+import { Factory } from 'sparqlalgebrajs';
+import type { ISmartKgData } from './ActorQueryOperationBgpSmartkgAdapter';
 import {
   ActorQueryOperationBgpSmartkgAdapter,
-  ISmartKgData,
   KEY_CONTEXT_SMARTKG_FLAG,
-} from "./ActorQueryOperationBgpSmartkgAdapter";
+} from './ActorQueryOperationBgpSmartkgAdapter';
 
 /**
  * A SmartKG BGP actor that resolves each SmartKG star pattern and the singular TPF BGP separately,
@@ -20,10 +21,9 @@ import {
  * for all star patterns is low to avoid expensive joins.
  */
 export class ActorQueryOperationBgpSmartkgStarJoin extends ActorQueryOperationBgpSmartkgAdapter {
-
   protected async executePatterns(starPatternsSmartKg: Algebra.Pattern[][], patternsTpf: Algebra.Pattern[],
-                                  smartKgData: ISmartKgData, sourceUriSmartKg: string, context: ActionContext,
-                                  patternOriginal: Algebra.Bgp): Promise<IActorQueryOperationOutput> {
+    smartKgData: ISmartKgData, sourceUriSmartKg: string, context: ActionContext,
+    patternOriginal: Algebra.Bgp): Promise<IActorQueryOperationOutput> {
     const algebraFactory = new Factory();
 
     // Execute each SmartKG star over the appropriate HDT files
@@ -54,5 +54,4 @@ export class ActorQueryOperationBgpSmartkgStarJoin extends ActorQueryOperationBg
     // Join the results of both
     return this.mediatorJoin.mediate({ entries: await Promise.all(starResults) });
   }
-
 }
